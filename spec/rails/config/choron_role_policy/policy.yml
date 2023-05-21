@@ -1,0 +1,19 @@
+comment_operate:
+  - full
+  - create
+  - read
+  - update
+  - delete
+  - read_all
+company_operate:
+  - full
+  - create
+  - read
+  - update
+  - delete
+  - brand_xxx
+  - brand_yyy
+plan_operate:
+  - full
+  - create
+  - update

@@ -1,0 +1,5 @@
+admin:
+  comment_operate:
+    - create
+    - update
+  company_operate: full
