@@ -1,37 +1,117 @@
 # ChoronRolePolicy
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/choron_role_policy`. To experiment with that code, run `bin/console` for an interactive prompt.
+`ChoronRolePolicy` は主に `Rails` の `Model` から利用されることを想定した認可の仕組みです。
+以下の特徴を持っています。
 
-TODO: Delete this and the text above, and describe your gem
+1. 設定ファイル（yml）だけを操作するだけで認可の設定を簡易に作成・更新することができる
+2. AWSのPolicyとRoleの考え方を基本としている
 
-## Installation
+## インストール
 
-Install the gem and add to the application's Gemfile by executing:
+```
+$ bundle add choron_role_policy
+```
 
-    $ bundle add choron_role_policy
+```
+$ gem install choron_role_policy
+```
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+## 使い方
 
-    $ gem install choron_role_policy
+### Railsからの利用
 
-## Usage
+インストール後、 `config/initializers` に `choron_role_policy.rb` を作成してください。
 
-TODO: Write usage instructions here
+```ruby
+ChoronRolePolicy.load
+```
 
-## Development
+後述する設定ファイルの置き場所を変更したいときは以下のように変更することが可能です。
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+```ruby
+ChoronRolePolicy.load do |config|
+  config.policy_file = "xxxx/yyyyy/policy.yml"
+  config.role_root = "xxxx/yyyyy/"
+end
+```
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+その後設定ファイルを配置してください。上記で変更をしているときは変更後のディレクトリ、もし何もしていなければデフォルトのディレクトリに配置をしてください。
 
-## Contributing
+以下はデフォルトのときの配置例です。
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/choron_role_policy. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/[USERNAME]/choron_role_policy/blob/main/CODE_OF_CONDUCT.md).
+* config/choron_role_policy/policy.yml
+
+以下のように認可が必要な操作を列挙していってください
+
+```yml
+company_operate:
+  - create
+  - read
+  - update
+  - destroy
+user_operate:
+  - read
+  - destroy
+```
+
+* config/choron_role_policy/staff.yml
+
+* 以下を参考に役割ごとにできる操作を定義してください
+
+```yml
+# スタッフのOwner権限はフル(全て許可)される
+owner:
+  company_operate: full
+  user_operate: full
+# スタッフのAdmin権限
+admin:
+  # 企業データは閲覧と更新が可能
+  company_operate:
+    - read
+    - update
+  # ユーザデータは閲覧のみ可能
+  user_operate:
+    - read
+# スタッフのMember権限
+member:
+  # 企業データは閲覧だけ可能
+  company_operate:
+    - read
+  # ユーザデータは権限なし
+```
+
+その後、これらの認可を行いたいモデルに本GemのModuleを読み込ませて、設定を行ってください
+
+```ruby
+# ユーザには staff_role という役割を示すDBのカラムを持っていることが前提です
+# staff_role :integer, default: 0
+class User < ApplicationRecord
+  include ChoronRolePolicy::DSL
+
+  # Railsのenumで定義。0が権限なし、1でmember, 2でadmin...
+  enum :staff, [:none, :member, :admin, :owner], prefix: true
+  # :staff というタイプを渡しているとき staff_role というカラム名をデフォルトで参照するため、その他の設定は不要
+  set_role :staff
+end
+```
+
+この設定が行った後、ControllerやModelで以下の利用に利用可能です。
+
+```ruby
+class FooController < ApplicationController
+  def show
+    # 企業操作のフルアクセスを持っているとき
+    if current_user.staff.company_operate?
+      # ...
+    end
+
+    # ユーザ操作の読み取り権限を持っているとき
+    if current_user.staff.user_operate?(:read)
+    end
+  end
+end
+```
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
-## Code of Conduct
-
-Everyone interacting in the ChoronRolePolicy project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/[USERNAME]/choron_role_policy/blob/main/CODE_OF_CONDUCT.md).
+[MIT License](https://opensource.org/licenses/MIT).
